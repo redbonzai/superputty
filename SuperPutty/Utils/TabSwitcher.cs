@@ -33,36 +33,21 @@ namespace SuperPutty.Utils
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(TabSwitcher));
 
-        public static ITabSwitchStrategy[] Strategies;
-        public TabSwitcher()
+        public static readonly ITabSwitchStrategy[] Strategies;
+        static TabSwitcher()
         {
-            this.Documents = this.tabSwitchStrategy.GetDocuments();
-            this.ActiveDocument = (ToolWindow)this.DockPanel.ActiveDocument;
-
-            if(Strategies == null)
+            List<ITabSwitchStrategy> strats = new List<ITabSwitchStrategy>
             {
-                List<ITabSwitchStrategy> strats = new List<ITabSwitchStrategy>
-                {
-                    new VisualOrderTabSwitchStrategy(),
-                    new OpenOrderTabSwitchStrategy(),
-                    new MRUTabSwitchStrategy()
-                };
-                Strategies = strats.ToArray();
-            }
+                new VisualOrderTabSwitchStrategy(),
+                new OpenOrderTabSwitchStrategy(),
+                new MRUTabSwitchStrategy()
+            };
+            //strats.Add(new MRUTabSwitchStrategyOld());
+            Strategies = strats.ToArray();
         }
 
         public static ITabSwitchStrategy StrategyFromTypeName(String typeName)
         {
-            if(Strategies == null)
-            {
-                List<ITabSwitchStrategy> strats = new List<ITabSwitchStrategy>
-                {
-                    new VisualOrderTabSwitchStrategy(),
-                    new OpenOrderTabSwitchStrategy(),
-                    new MRUTabSwitchStrategy()
-                };
-                Strategies = strats.ToArray();
-            }
             ITabSwitchStrategy strategy = Strategies[0];
             try
             {
@@ -121,9 +106,7 @@ namespace SuperPutty.Utils
             set
             {
                 //Log.Info("Setting current doc: " + value);
-                this.currentDocument = value;
                 this.TabSwitchStrategy.SetCurrentTab(value);
-                this.IsSwitchingTabs = false;
             }
         }
 
@@ -159,13 +142,11 @@ namespace SuperPutty.Utils
 
         public bool MoveToNextDocument()
         {
-            this.IsSwitchingTabs = true;
             return this.TabSwitchStrategy.MoveToNextTab();
         }
 
         public bool MoveToPrevDocument()
         {
-            this.IsSwitchingTabs = true;
             return this.TabSwitchStrategy.MoveToPrevTab();
         }
 
@@ -182,10 +163,10 @@ namespace SuperPutty.Utils
             }
         }
 
-        public IList<IDockContent> Documents;
-        public ToolWindow ActiveDocument;
+        public IList<IDockContent> Documents { get { return this.tabSwitchStrategy.GetDocuments(); } } 
+
+        public ToolWindow ActiveDocument { get { return (ToolWindow)this.DockPanel.ActiveDocument; } }
         public DockPanel DockPanel { get; private set; }
-        public bool IsSwitchingTabs { get; set; }
 
         ITabSwitchStrategy tabSwitchStrategy;
         ToolWindow currentDocument;
@@ -195,7 +176,7 @@ namespace SuperPutty.Utils
     #region ITabSwitchStrategy
     public interface ITabSwitchStrategy : IDisposable
     {
-        string Description { get; }         
+        string Description { get; }
         IList<IDockContent> GetDocuments();
         void Initialize(DockPanel panel);
         void AddTab(ToolWindow tab);
@@ -320,12 +301,13 @@ namespace SuperPutty.Utils
     public class MRUTabSwitchStrategy : ITabSwitchStrategy
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(MRUTabSwitchStrategy));
-        public string Description { get; protected set; }
+
+        public string Description { get { return "MRU: Similar to Windows Alt-Tab"; } }
+        private bool IsSwitchingTabs = false;
 
         public void Initialize(DockPanel panel)
         {
             this.DockPanel = panel;
-			Description = "MRU: Similar to Windows Alt-Tab";
         }
 
         public void AddTab(ToolWindow newTab)
@@ -339,14 +321,21 @@ namespace SuperPutty.Utils
             this.docs.Remove(oldTab);
         }
 
+        private void switchToTab(ToolWindow window)
+        {
+            IsSwitchingTabs = true;
+            window.Activate();
+            IsSwitchingTabs = false;
+        }
+
         public bool MoveToNextTab()
         {
             bool res = false;
             int idx = docs.IndexOf(this.DockPanel.ActiveDocument);
             if (idx != -1)
             {
-                ToolWindow winNext = (ToolWindow)docs[idx == docs.Count - 1 ? 0 : idx + 1];
-                winNext.Activate();
+                ToolWindow winNext = (ToolWindow)docs[idx == 0 ? docs.Count - 1 : idx - 1];
+                switchToTab(winNext);
                 res = true;
             }
             return res;
@@ -359,7 +348,7 @@ namespace SuperPutty.Utils
             if (idx != -1)
             {
                 ToolWindow winNext = (ToolWindow)docs[idx == docs.Count - 1 ? 0 : idx + 1];
-                winNext.Activate();
+                switchToTab(winNext);
                 res = true;
             }
             return res;
@@ -367,7 +356,10 @@ namespace SuperPutty.Utils
 
         public void SetCurrentTab(ToolWindow window)
         {
-            if (window != null)
+            // If we aren't using Ctrl-Tab to move between panels,
+            // i.e. we got here because the operator clicked on the
+            // panel directly, then record it as the current panel.           
+            if (!IsSwitchingTabs && window != null)
             {
                 if (this.docs.Contains(window))
                 {

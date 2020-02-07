@@ -67,12 +67,19 @@ namespace SuperPutty
 DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public string ApplicationWorkingDirectory { get; set; }
 
-        public IntPtr AppWindowHandle;
+        public IntPtr AppWindowHandle { get { return this.m_AppWin; } } 
+        
+        // Some windows need closed with WM_DESTROY others need closed with WM_CLOSE or they leave zombies
+        public bool ApplicationCloseWithDestroy { get; set; }
 
         #endregion
 
         public ApplicationPanel()
         {
+            this.ApplicationName = "";
+            this.ApplicationParameters = "";
+            this.ApplicationWorkingDirectory = "";
+
             this.Disposed += new EventHandler(ApplicationPanel_Disposed);
             SuperPuTTY.LayoutChanged += new EventHandler<Data.LayoutChangedEventArgs>(SuperPuTTY_LayoutChanged);
 
@@ -83,11 +90,6 @@ DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
             //this.m_windowActivator = new SetFGCombinedWindowActivator();
             SuperPuTTY.Settings.SettingsSaving += Settings_SettingsSaving;
             SuperPuTTY.WindowEvents.SystemSwitch += new EventHandler<GlobalWindowEventArgs>(OnSystemSwitch);
-            this.ApplicationName = "";
-            this.ApplicationParameters = "";
-            this.ApplicationWorkingDirectory = "";
-            this.AppWindowHandle = this.m_AppWin;
-            this.ExternalProcessCaptured = (this.m_AppWin != IntPtr.Zero);
         }
 
         void Settings_SettingsSaving(object sender, CancelEventArgs e)
@@ -317,7 +319,7 @@ DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
                 {
                     if(!File.Exists(ApplicationName))
                     {
-                        MessageBox.Show("putty.exe not found in configured path, please go into tools->settings and set the correct path", "Application Not Found");
+                        MessageBox.Show(ApplicationName + " not found in configured path, please go into tools->settings and set the correct path", "Application Not Found");
                         return;
                     }
                     m_Process = new Process
@@ -329,7 +331,6 @@ DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
                             Arguments = ApplicationParameters
                         }
                     };
-                    //m_Process.Exited += new EventHandler(p_Exited);
 
                     if (!string.IsNullOrEmpty(this.ApplicationWorkingDirectory) &&
                         Directory.Exists(this.ApplicationWorkingDirectory))
@@ -406,7 +407,7 @@ DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
                 }
                 
                 if(this.m_AppWin != IntPtr.Zero)
-                {                    
+                {
                     // Set the application as a child of the parent form
                     NativeMethods.SetParent(m_AppWin, this.Handle);
 
@@ -463,7 +464,11 @@ DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
                 // Send WM_DESTROY instead of WM_CLOSE, so that the Client doesn't
                 // ask in the Background whether the session shall be closed.
                 // Otherwise an annoying beep is generated everytime a terminal session is closed.
-                NativeMethods.PostMessage(m_AppWin, NativeMethods.WM_DESTROY, 0, 0);
+                if (this.ApplicationCloseWithDestroy) {
+                    NativeMethods.PostMessage(m_AppWin, NativeMethods.WM_DESTROY, 0, 0);
+                } else {
+                    NativeMethods.PostMessage(m_AppWin, NativeMethods.WM_CLOSE, 0, 0);
+                }
 
                 System.Threading.Thread.Sleep(ClosePuttyWaitTimeMs);
 
@@ -491,7 +496,7 @@ DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
             base.OnResize(e);
         }
 
-        public bool ExternalProcessCaptured;
+        public bool ExternalProcessCaptured { get { return this.m_AppWin != IntPtr.Zero; } }
 
         #endregion    
     

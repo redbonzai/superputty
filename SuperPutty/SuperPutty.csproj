@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>SuperPutty</RootNamespace>
     <AssemblyName>SuperPutty</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
@@ -43,6 +43,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>true</UseVSHostingProcess>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -52,6 +53,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>false</UseVSHostingProcess>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>SuperPutty.Program</StartupObject>
@@ -60,9 +62,8 @@
     <ApplicationIcon>Apps-utilities-terminal.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="log4net, Version=1.2.11.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>Lib\log4net.dll</HintPath>
+    <Reference Include="log4net, Version=2.0.8.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
+      <HintPath>..\packages\log4net.2.0.8\lib\net45-full\log4net.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.configuration" />
@@ -77,9 +78,8 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
-    <Reference Include="WeifenLuo.WinFormsUI.Docking, Version=2.3.1.41552, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\bin\WeifenLuo.WinFormsUI.Docking.dll</HintPath>
+    <Reference Include="WeifenLuo.WinFormsUI.Docking, Version=3.0.6.0, Culture=neutral, PublicKeyToken=5cded1a1a0a7b481, processorArchitecture=MSIL">
+      <HintPath>..\packages\DockPanelSuite.3.0.6\lib\net40\WeifenLuo.WinFormsUI.Docking.dll</HintPath>
     </Reference>
     <Reference Include="WindowsBase" />
   </ItemGroup>
@@ -128,7 +128,6 @@
     </Compile>
     <Compile Include="Gui\QuickSelectorData.cs">
       <DependentUpon>QuickSelectorData.xsd</DependentUpon>
-      <SubType>Component</SubType>
     </Compile>
     <Compile Include="Gui\QuickSelectorData.Designer.cs">
       <AutoGen>True</AutoGen>
@@ -274,6 +273,7 @@
     <Compile Include="Utils\GlobalWindowEvents.cs" />
     <Compile Include="Utils\HostConnectionString.cs" />
     <Compile Include="Utils\MinttyStartInfo.cs" />
+    <Compile Include="Utils\VNCStartInfo.cs" />
     <Compile Include="Utils\NativeMethods.cs" />
     <Compile Include="Utils\PortableSettingsProvider.cs" />
     <Compile Include="Utils\PropertyNotifiableObject.cs" />
@@ -442,6 +442,7 @@
     <None Include="Gui\QuickSelectorData.xss">
       <DependentUpon>QuickSelectorData.xsd</DependentUpon>
     </None>
+    <None Include="packages.config" />
     <None Include="Properties\DataSources\SuperPutty.Data.KeyboardShortcut.datasource" />
     <None Include="Properties\DataSources\SuperPutty.Scp.FileTransferViewItem.datasource" />
     <None Include="Properties\DataSources\SuperPutty.Scp.IBrowserModel.datasource" />
@@ -456,9 +457,7 @@
     <None Include="Resources\script_code.png" />
     <None Include="Resources\folder-up.png" />
     <None Include="Resources\page-blue.png" />
-    <Content Include="_Lib\WeifenLuo.WinFormsUI.Docking.dll" />
     <None Include="Resources\find.png" />
-    <Content Include="_Lib\log4net.dll" />
     <Content Include="Resources\accept-gray.png" />
     <Content Include="Resources\application_edit.png" />
     <Content Include="Resources\Apps-terminal.ico" />
@@ -475,12 +474,13 @@
     <None Include="Resources\tick.png" />
     <None Include="Resources\server_go.png" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>IF NOT EXIST $(SolutionDir)bin\Release\themes mkdir $(SolutionDir)bin\Release\themes 
-IF NOT EXIST $(SolutionDir)bin\Release\themes\default xcopy /E  /Y $(ProjectDir)Resources\themes $(SolutionDir)bin\Release\themes
-IF NOT EXIST $(SolutionDir)bin\Debug\themes mkdir $(SolutionDir)bin\Debug\themes 
-IF NOT EXIST $(SolutionDir)bin\Debug\themes\default xcopy /E  /Y $(ProjectDir)Resources\themes $(SolutionDir)bin\Debug\themes</PostBuildEvent>
+    <PostBuildEvent>IF NOT EXIST "$(SolutionDir)bin\Release\themes" mkdir "$(SolutionDir)bin\Release\themes"
+IF NOT EXIST "$(SolutionDir)bin\Release\themes\default" xcopy /E  /Y "$(ProjectDir)Resources\themes" "$(SolutionDir)bin\Release\themes\"
+IF NOT EXIST "$(SolutionDir)bin\Debug\themes" mkdir "$(SolutionDir)bin\Debug\themes" 
+IF NOT EXIST "$(SolutionDir)bin\Debug\themes\default" xcopy /E  /Y "$(ProjectDir)Resources\themes" "$(SolutionDir)bin\Debug\themes\"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -49,13 +49,11 @@ namespace SuperPutty
         private static int RefocusIntervalMs = Convert.ToInt32(ConfigurationManager.AppSettings["SuperPuTTY.RefocusIntervalMs"] ?? "80");
 
         private PuttyStartInfo m_puttyStartInfo;
-        private ApplicationPanel m_AppPanel;
-        private SessionData m_Session;
         private PuttyClosedCallback m_ApplicationExit;
 
         public ctlPuttyPanel(SessionData session, PuttyClosedCallback callback)
         {
-            m_Session = session;
+            Session = session;
             m_ApplicationExit = callback;
             m_puttyStartInfo = new PuttyStartInfo(session);
 
@@ -66,8 +64,6 @@ namespace SuperPutty
             this.TextOverride = session.SessionName;
 
             CreatePanel();
-            this.Session = this.m_Session;
-            this.AppPanel = this.m_AppPanel;
             AdjustMenu();
         }
 
@@ -98,18 +94,19 @@ namespace SuperPutty
 
         private void CreatePanel()
         {
-            this.m_AppPanel = new ApplicationPanel();
+            this.AppPanel = new ApplicationPanel();
             this.SuspendLayout();            
-            this.m_AppPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.m_AppPanel.ApplicationName = this.m_puttyStartInfo.Executable;
-            this.m_AppPanel.ApplicationParameters = this.m_puttyStartInfo.Args;
-            this.m_AppPanel.ApplicationWorkingDirectory = this.m_puttyStartInfo.WorkingDir;
-            this.m_AppPanel.Location = new System.Drawing.Point(0, 0);
-            this.m_AppPanel.Name = this.m_Session.SessionId; // "applicationControl1";
-            this.m_AppPanel.Size = new System.Drawing.Size(this.Width, this.Height);
-            this.m_AppPanel.TabIndex = 0;            
-            this.m_AppPanel.m_CloseCallback = this.m_ApplicationExit;
-            this.Controls.Add(this.m_AppPanel);
+            this.AppPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.AppPanel.ApplicationName = this.m_puttyStartInfo.Executable;
+            this.AppPanel.ApplicationParameters = this.m_puttyStartInfo.Args;
+            this.AppPanel.ApplicationWorkingDirectory = this.m_puttyStartInfo.WorkingDir;
+            this.AppPanel.ApplicationCloseWithDestroy = this.Session.Proto == ConnectionProtocol.Mintty ? false : true;
+            this.AppPanel.Location = new System.Drawing.Point(0, 0);
+            this.AppPanel.Name = this.Session.SessionId; // "applicationControl1";
+            this.AppPanel.Size = new System.Drawing.Size(this.Width, this.Height);
+            this.AppPanel.TabIndex = 0;            
+            this.AppPanel.m_CloseCallback = this.m_ApplicationExit;
+            this.Controls.Add(this.AppPanel);
 
             this.ResumeLayout();
         }
@@ -130,30 +127,38 @@ namespace SuperPutty
             }
         }
 
-        void CreateMenu()
+        private void InitNewSessionToolStripMenuItems()
         {
-            this.newSessionToolStripMenuItem.Enabled = SuperPuTTY.Settings.PuttyPanelShowNewSessionMenu;
-            if (SuperPuTTY.Settings.PuttyPanelShowNewSessionMenu)
+            List<ToolStripMenuItem> tsmi = new List<ToolStripMenuItem>();
+            foreach (SessionData session in SuperPuTTY.GetAllSessions())
             {
-                this.contextMenuStrip1.SuspendLayout();
-
-                // BBB: do i need to dispose each one?
-                newSessionToolStripMenuItem.DropDownItems.Clear();
-                foreach (SessionData session in SuperPuTTY.GetAllSessions())
+                ToolStripMenuItem tsmiParent = null;
+                foreach (string part in SessionData.GetSessionNameParts(session.SessionId))
                 {
-                    ToolStripMenuItem tsmiParent = newSessionToolStripMenuItem;
-                    foreach (string part in SessionData.GetSessionNameParts(session.SessionId))
+                    if (part == session.SessionName)
                     {
-                        if (part == session.SessionName)
+                        ToolStripMenuItem newSessionTSMI = new ToolStripMenuItem
                         {
-                            ToolStripMenuItem newSessionTSMI = new ToolStripMenuItem
-                            {
-                                Tag = session,
-                                Text = session.SessionName
-                            };
-                            newSessionTSMI.Click += new System.EventHandler(newSessionTSMI_Click);
-                            newSessionTSMI.ToolTipText = session.ToString();
+                            Tag = session,
+                            Text = session.SessionName
+                        };
+                        newSessionTSMI.Click += new System.EventHandler(newSessionTSMI_Click);
+                        newSessionTSMI.ToolTipText = session.ToString();
+                        if (tsmiParent == null)
+                            tsmi.Add(newSessionTSMI);
+                        else
                             tsmiParent.DropDownItems.Add(newSessionTSMI);
+                    }
+                    else
+                    {
+                        if (tsmiParent == null)
+                        {
+                            tsmiParent = tsmi.FirstOrDefault((item) => string.Equals(item.Name, part));
+                            if (tsmiParent == null)
+                            {
+                                tsmiParent = new ToolStripMenuItem(part) { Name = part };
+                                tsmi.Add(tsmiParent);
+                            }
                         }
                         else
                         {
@@ -163,14 +168,33 @@ namespace SuperPutty
                             }
                             else
                             {
-                                ToolStripMenuItem newSessionFolder = new ToolStripMenuItem(part) {Name = part};
+                                ToolStripMenuItem newSessionFolder = new ToolStripMenuItem(part) { Name = part };
                                 tsmiParent.DropDownItems.Add(newSessionFolder);
                                 tsmiParent = newSessionFolder;
                             }
                         }
                     }
                 }
-                this.contextMenuStrip1.ResumeLayout();
+            }
+
+            if (InvokeRequired)
+                Invoke(new Action(() => {
+                    if (newSessionToolStripMenuItem.DropDownItems.Count == 0)
+                        newSessionToolStripMenuItem.DropDownItems.AddRange(tsmi.ToArray());
+                }));
+            else
+                if (newSessionToolStripMenuItem.DropDownItems.Count == 0)
+                    newSessionToolStripMenuItem.DropDownItems.AddRange(tsmi.ToArray());
+        }
+
+        void CreateMenu()
+        {
+            this.newSessionToolStripMenuItem.Enabled = SuperPuTTY.Settings.PuttyPanelShowNewSessionMenu;
+            if (SuperPuTTY.Settings.PuttyPanelShowNewSessionMenu)
+            {
+                newSessionToolStripMenuItem.DropDownItems.Clear();
+
+                new Thread(InitNewSessionToolStripMenuItems).Start();
             }
 
             DockPane pane = GetDockPane();
@@ -266,13 +290,13 @@ namespace SuperPutty
         /// </summary>
         internal void SetFocusToChildApplication(string caller)
         {
-            if (!this.m_AppPanel.ExternalProcessCaptured) { return; }
+            if (!this.AppPanel.ExternalProcessCaptured) { return; }
 
             bool success = false;
             for (int i = 0; i < RefocusAttempts; i++)
             {
                 Thread.Sleep(RefocusIntervalMs);
-                if (this.m_AppPanel.ReFocusPuTTY(caller))
+                if (this.AppPanel.ReFocusPuTTY(caller))
                 {
                     if (i > 0)
                     {
@@ -293,8 +317,8 @@ namespace SuperPutty
         {
             string str = String.Format("{0}?SessionId={1}&TabName={2}", 
                 this.GetType().FullName, 
-                HttpUtility.UrlEncodeUnicode(this.m_Session.SessionId), 
-                HttpUtility.UrlEncodeUnicode(this.TextOverride));
+                HttpUtility.UrlEncode(this.Session.SessionId), 
+                HttpUtility.UrlEncode(this.TextOverride));
             return str;
         }
 
@@ -365,7 +389,7 @@ namespace SuperPutty
  
         private void duplicateSessionToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            SuperPuTTY.OpenPuttySession(this.m_Session);
+            SuperPuTTY.OpenPuttySession(this.Session);
         }
 
         private void renameTabToolStripMenuItem_Click(object sender, EventArgs e)
@@ -373,7 +397,7 @@ namespace SuperPutty
             dlgRenameItem dialog = new dlgRenameItem
             {
                 ItemName = this.Text,
-                DetailName = this.m_Session.SessionId
+                DetailName = this.Session.SessionId
             };
 
             if (dialog.ShowDialog(this) == DialogResult.OK)
@@ -385,14 +409,14 @@ namespace SuperPutty
 
         private void refreshToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (this.m_AppPanel != null)
+            if (this.AppPanel != null)
             {
-                this.m_AppPanel.RefreshAppWindow();
+                this.AppPanel.RefreshAppWindow();
             }
         }
 
-        public SessionData Session;
-        public ApplicationPanel AppPanel;
+        public SessionData Session { get; }
+        public ApplicationPanel AppPanel { get; private set; }
         public ctlPuttyPanel previousPanel { get; set; }
         public ctlPuttyPanel nextPanel { get; set; }
 
@@ -429,7 +453,7 @@ namespace SuperPutty
                     this.SetFocusToChildApplication("MenuHandler");
                     for (int i = 0; i < commands.Length; ++i)
                     {
-                        NativeMethods.SendMessage(m_AppPanel.AppWindowHandle, (uint)NativeMethods.WM.SYSCOMMAND, commands[i], 0);
+                        NativeMethods.SendMessage(AppPanel.AppWindowHandle, (uint)NativeMethods.WM.SYSCOMMAND, commands[i], 0);
                     }
                 }
                 catch (Exception ex)
